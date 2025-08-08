@@ -1,0 +1,15 @@
+#!/bin/bash
+# Script to get Pikachu data from the Pokémon API
+
+API_URL="https://pokeapi.co/api/v2/pokemon/pikachu"
+OUTPUT_FILE="data.json"
+ERROR_FILE="errors.txt"
+
+# Make the API request
+if curl -s -o "$OUTPUT_FILE" -w "%{http_code}" "$API_URL" | grep -q "200"; then
+    echo "Data successfully saved to $OUTPUT_FILE"
+else
+    echo "Error fetching data from API" >> "$ERROR_FILE"
+    echo "Check $ERROR_FILE for details."
+fi
+
