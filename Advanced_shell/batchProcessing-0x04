@@ -64,5 +64,5 @@ duration=$((SECONDS - start_time))
 echo "Parallel fetch completed in $duration seconds"
 echo "Successfully fetched $(ls -1 "$DATA_DIR"/*.json 2>/dev/null | wc -l) Pokémon"
 echo "Failures: $(grep -c "Failed:" "$LOG_FILE" 2>/dev/null || echo 0)"
-
+["kill"]
 exit 0
