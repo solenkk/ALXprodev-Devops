@@ -1,0 +1,46 @@
+#!/bin/bash
+# Pokémon Data Summary Report Script
+
+# Output CSV file
+report_file="pokemon_report.csv"
+timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+
+# Create CSV header
+echo "Name,Height (m),Weight (kg)" > "$report_file"
+
+# Initialize totals for averages
+total_height=0
+total_weight=0
+count=0
+
+# Process each JSON file in pokemon_data directory
+for json_file in pokemon_data/*.json; do
+    # Extract data using jq
+    name=$(jq -r '.name' "$json_file")
+    height=$(jq -r '.height' "$json_file")
+    weight=$(jq -r '.weight' "$json_file")
+    
+    # Convert units (decimeters to meters, hectograms to kilograms)
+    height_m=$(awk "BEGIN {printf \"%.2f\", $height/10}")
+    weight_kg=$(awk "BEGIN {printf \"%.2f\", $weight/10}")
+    
+    # Add to CSV
+    echo "$name,$height_m,$weight_kg" >> "$report_file"
+    
+    # Add to totals for averages
+    total_height=$(awk "BEGIN {print $total_height + $height_m}")
+    total_weight=$(awk "BEGIN {print $total_weight + $weight_kg}")
+    ((count++))
+done
+
+# Calculate averages
+avg_height=$(awk "BEGIN {printf \"%.2f\", $total_height/$count}")
+avg_weight=$(awk "BEGIN {printf \"%.2f\", $total_weight/$count}")
+
+# Print summary
+echo "CSV Report generated at: $report_file"
+echo ""
+cat "$report_file"
+echo ""
+echo "Average Height: $avg_height m"
+echo "Average Weight: $avg_weight kg"

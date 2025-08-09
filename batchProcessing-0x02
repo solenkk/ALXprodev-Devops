@@ -1,0 +1,73 @@
+#!/bin/bash
+# Batch Pokémon Data Retrieval Script with Error Handling
+
+# Configuration
+MAX_RETRIES=3
+RETRY_DELAY=2
+LOG_FILE="pokemon_fetch_errors.log"
+DATA_DIR="pokemon_data"
+
+# Create directories
+mkdir -p "$DATA_DIR"
+rm -f "$LOG_FILE" 2>/dev/null
+
+# List of Pokémon to fetch
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Base API URL
+api_url="https://pokeapi.co/api/v2/pokemon"
+
+# Function to make API request with retries
+fetch_pokemon_data() {
+    local pokemon=$1
+    local attempt=0
+    local success=0
+    
+    while [[ $attempt -lt $MAX_RETRIES ]]; do
+        attempt=$((attempt + 1))
+        
+        echo "Attempt $attempt for $pokemon..."
+        
+        # Make API request with timeout
+        if curl -sS --max-time 30 "${api_url}/${pokemon}" > "${DATA_DIR}/${pokemon}.json.tmp"; then
+            # Validate JSON response
+            if jq -e . >/dev/null 2>&1 < "${DATA_DIR}/${pokemon}.json.tmp"; then
+                mv "${DATA_DIR}/${pokemon}.json.tmp" "${DATA_DIR}/${pokemon}.json"
+                echo "Saved data to ${DATA_DIR}/${pokemon}.json ✅"
+                success=1
+                break
+            else
+                echo "Invalid JSON received for $pokemon" >> "$LOG_FILE"
+                rm -f "${DATA_DIR}/${pokemon}.json.tmp"
+            fi
+        else
+            echo "Network error for $pokemon (attempt $attempt)" >> "$LOG_FILE"
+        fi
+        
+        # Delay before retry (with exponential backoff)
+        sleep $((RETRY_DELAY * attempt))
+    done
+    
+    if [[ $success -eq 0 ]]; then
+        echo "Failed to fetch $pokemon after $MAX_RETRIES attempts ❌"
+        echo "$pokemon: Failed after $MAX_RETRIES attempts" >> "$LOG_FILE"
+    fi
+    
+    return $success
+}
+
+# Process each Pokémon
+for pokemon in "${pokemon_list[@]}"; do
+    echo "Fetching data for $pokemon..."
+    fetch_pokemon_data "$pokemon"
+    
+    # Add delay between requests to be polite to the API
+    sleep 1
+done
+
+# Final status
+echo "Batch processing complete."
+if [[ -f "$LOG_FILE" ]]; then
+    echo "Errors logged in $LOG_FILE:"
+    cat "$LOG_FILE"
+fi

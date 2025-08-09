@@ -1,0 +1,31 @@
+#!/bin/bash
+# Batch Pokémon Data Retrieval Script
+
+# Create directory for storing Pokémon data
+mkdir -p pokemon_data
+
+# List of Pokémon to fetch
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Base API URL
+api_url="https://pokeapi.co/api/v2/pokemon"
+
+# Process each Pokémon
+for pokemon in "${pokemon_list[@]}"; do
+    echo "Fetching data for $pokemon..."
+    
+    # Make API request and save to file
+    curl -s "${api_url}/${pokemon}" > "pokemon_data/${pokemon}.json"
+    
+    # Check if request was successful
+    if [ $? -eq 0 ]; then
+        echo "Saved data to pokemon_data/${pokemon}.json ✅"
+    else
+        echo "Failed to fetch data for $pokemon ❌"
+    fi
+    
+    # Add delay to avoid rate limiting (1 second)
+    sleep 1
+done
+
+echo "Batch Pokémon data retrieval complete!"

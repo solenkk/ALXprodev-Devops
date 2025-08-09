@@ -1,0 +1,68 @@
+#!/bin
+/bash
+# Parallel Pokémon Data Retrieval Script
+
+# Configuration
+MAX_CONCURRENT=3  # Limit concurrent processes
+API_URL="https://pokeapi.co/api/v2/pokemon"
+DATA_DIR="pokemon_data_parallel"
+LOG_FILE="parallel_fetch.log"
+
+# Initialize
+mkdir -p "$DATA_DIR"
+rm -f "$LOG_FILE" 2>/dev/null
+declare -A pids  # Track process IDs
+
+# Pokémon list
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Function to fetch a single Pokémon
+fetch_pokemon() {
+    local pokemon=$1
+    local attempt=0
+    local max_attempts=2
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        if curl -sS --max-time 10 "${API_URL}/${pokemon}" > "${DATA_DIR}/${pokemon}.json.tmp"; then
+            if jq -e . >/dev/null 2>&1 < "${DATA_DIR}/${pokemon}.json.tmp"; then
+                mv "${DATA_DIR}/${pokemon}.json.tmp" "${DATA_DIR}/${pokemon}.json"
+                echo "$(date '+%T') Success: $pokemon" >> "$LOG_FILE"
+                return 0
+            fi
+        fi
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+    
+    echo "$(date '+%T') Failed: $pokemon after $max_attempts attempts" >> "$LOG_FILE"
+    rm -f "${DATA_DIR}/${pokemon}.json.tmp" 2>/dev/null
+    return 1
+}
+
+# Main execution
+echo "Starting parallel fetch at $(date)"
+start_time=$SECONDS
+
+(
+    for pokemon in "${pokemon_list[@]}"; do
+        # Wait if we've reached max concurrent processes
+        while [[ $(jobs -rp | wc -l) -ge $MAX_CONCURRENT ]]; do
+            sleep 0.1
+        done
+        
+        # Start fetch in background
+        fetch_pokemon "$pokemon" &
+        pids[$!]=$pokemon
+    done
+    
+    # Wait for all background processes
+    wait
+) | tee -a "$LOG_FILE"
+
+# Calculate duration
+duration=$((SECONDS - start_time))
+echo "Parallel fetch completed in $duration seconds"
+echo "Successfully fetched $(ls -1 "$DATA_DIR"/*.json 2>/dev/null | wc -l) Pokémon"
+echo "Failures: $(grep -c "Failed:" "$LOG_FILE" 2>/dev/null || echo 0)"
+
+exit 0
